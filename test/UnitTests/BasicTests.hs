@@ -51,6 +51,7 @@ import           Contract.Freelance
 -- tests :: IO ()
 -- tests = defaultMain testThese
 
+tests :: TestTree
 tests = testGroup "Tests" [test1 empParams, test2 empParams, test3 empParams,test4 empParams,test5 empParams,test6 empParams,test7 empParams,test8 empParams]
 
 -- Basic Params
@@ -82,7 +83,6 @@ trace1 ep = do
     h2 <- activateContractWallet (Wallet 2) endpoints
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     -- Wont change
     callEndpoint @"start" h1 ep
     -- Wont change
@@ -149,7 +149,7 @@ trace2 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
+
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -282,7 +282,6 @@ trace4 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -346,7 +345,6 @@ trace5 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -413,7 +411,6 @@ trace6 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -477,7 +474,6 @@ trace7 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -542,7 +538,6 @@ trace8 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -605,7 +600,6 @@ trace9 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
@@ -669,7 +663,6 @@ trace10 ep = do
 
     -- Wont change
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
     
     -- Wont change
     callEndpoint @"start" h1 ep
