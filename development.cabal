@@ -1,0 +1,56 @@
+Cabal-Version:      2.4
+Name:               development
+Version:            0.1.0.0
+Author:              Isaac Padberg
+Maintainer:          iaverypadberg@gmail.com
+Build-Type:          Simple
+License:             Apache-2.0
+License-files:       LICENSE
+
+library
+  hs-source-dirs:      src
+  exposed-modules:
+                       Contract.Freelance
+                     , Contract.FreelanceTrace
+  build-depends:       aeson
+                     , base ^>=4.14.1.0
+                     , containers
+                     , data-default
+                     , freer-extras
+                     , playground-common
+                     , plutus-contract
+                     , plutus-ledger
+                     , plutus-ledger-api
+                     , plutus-tx-plugin
+                     , plutus-tx
+                     , QuickCheck
+                     , lens
+                     , tasty
+                     , text
+  default-language:    Haskell2010
+  ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
+
+test-suite freelance-tests
+  type: exitcode-stdio-1.0
+  main-is: Tests.hs
+  hs-source-dirs:      test
+  other-modules:       UnitTests.BasicTests
+                     , PropertyTests.Model
+  default-language: Haskell2010
+  ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -main-is Main
+  build-depends:       base ^>=4.14.1.0
+                     , containers
+                     , data-default
+                     , freer-extras
+                     , lens
+                     , plutus-contract
+                     , plutus-ledger
+                     , plutus-ledger-api
+                     , development
+                     , plutus-tx
+                     , QuickCheck
+                     , tasty
+                     , tasty-quickcheck
+                     , text
+  if !(impl(ghcjs) || os(ghcjs))
+    build-depends: plutus-tx-plugin -any
