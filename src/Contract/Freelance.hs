@@ -28,11 +28,12 @@
 module Contract.Freelance
     ( FreelanceContract (..)
     , EmployerParams (..)
-    , FreelancerParams (..)
+    , FStartSchema
     , FContractSchema
     , Last (..)
     , ThreadToken
     , Text
+    , startEndpoints
     , endpoints
     ) where
 
@@ -65,7 +66,7 @@ data FreelanceContract = FreelanceContract{
     totalPayment        :: !Integer,
     startTime           :: !POSIXTime,
     signDeadline        :: !POSIXTime,
-    cToken              :: !ThreadToken
+    cToken              :: !(Maybe ThreadToken)
 }deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq)
 
 PlutusTx.makeLift ''FreelanceContract
@@ -225,7 +226,7 @@ fcontractStateMachine fcontract = StateMachine
     { smTransition  = transition fcontract
     , smFinal       = final
     , smCheck       = check
-    , smThreadToken = Just $ cToken fcontract
+    , smThreadToken = cToken fcontract
     }
 
 {-# INLINABLE mkFContractValidator #-}
@@ -271,10 +272,10 @@ waitUntilTimeHasPassed :: AsContractError e => POSIXTime -> Contract w s e ()
 waitUntilTimeHasPassed t = void $ awaitTime t >> waitNSlots 1
 
 -- Function for starting an instance of the freelancer contract
-startFContract :: forall s. EmployerParams -> Contract (Last ThreadToken) s Text ()
+startFContract :: forall s. EmployerParams -> Contract (Last FreelanceContract) s Text ()
 startFContract emp = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
-    tt  <- mapError' getThreadToken
+    tt  <- Just <$> mapError' getThreadToken
     let fcontract   = FreelanceContract
             { employer          = pkh
             , freelancer        = eFreelancer emp
@@ -289,7 +290,7 @@ startFContract emp = do
         v      = lovelaceValueOf (eTotalPayment emp)
     void $ mapError' $ runInitialise client (FContractDatum 0 0) v
     logInfo @String $ "A freelance contract has been created for this PKH: " ++ show (eFreelancer emp)
-    tell $ Last $ Just tt
+    tell $ Last $ Just fcontract
 
 -- Datatype outlining the params for the freelancer
 data FreelancerParams = FreelancerParams
@@ -303,29 +304,16 @@ data FreelancerParams = FreelancerParams
     } deriving (Show, Generic, FromJSON, ToJSON)
 
 -- Function for accepting a contract
-acceptFContract :: forall s. FreelancerParams -> Contract (Last ThreadToken) s Text ()
+acceptFContract :: FreelanceContract -> Contract w s Text ()
 acceptFContract fp = do
-    pkh <- pubKeyHash <$> Contract.ownPubKey
-    let fcontract   = FreelanceContract
-            { employer          = fEmployer fp
-            , freelancer        = pkh
-            , numberOfIntervals = fNumberOfIntervals fp
-            , intervalLength    = fIntervalLength fp
-            , startTime         = fStartTime fp
-            , signDeadline      = fSignDeadline fp
-            , totalPayment      = fTotalPayment fp
-            , cToken            = fToken fp
-            }
-        client = fContractClient fcontract
-        
+    let client = fContractClient fp
     m <- mapError' $ getOnChainState client
     case m of
         Nothing             -> throwError "Contract ouput not found"
         Just ((o, _), _) -> case tyTxOutData o of
-
             FContractDatum _ _-> do
                 logInfo @String "Contract found. Accepting..."
-                void $ mapError' $ runStep client $ Accept
+                void $ mapError' $ runStep client Accept
                 logInfo @String "Contract Accepted"
 
             _ -> throwError "unexpected datum"
@@ -334,22 +322,10 @@ acceptFContract fp = do
     -- waitUntilTimeHasPassed $ fIntervalLength fp * fNumberOfIntervals fp
 
 -- Function for claiming funds from a contract
-claimFContract :: forall s. FreelancerParams -> Contract (Last ThreadToken) s Text ()
+claimFContract :: FreelanceContract -> Contract w s Text ()
 claimFContract fp = do
-    pkh <- pubKeyHash <$> Contract.ownPubKey
     now <- Contract.currentTime
-    let fcontract   = FreelanceContract
-            { employer          = fEmployer fp
-            , freelancer        = pkh
-            , numberOfIntervals = fNumberOfIntervals fp
-            , intervalLength    = fIntervalLength fp
-            , startTime         = fStartTime fp
-            , signDeadline      = fSignDeadline fp
-            , totalPayment      = fTotalPayment fp
-            , cToken            = fToken fp
-            }
-        client = fContractClient fcontract
-        
+    let client = fContractClient fp
     m <- mapError' $ getOnChainState client
     case m of
         Nothing             -> throwError "Contract ouput not found"
@@ -362,23 +338,16 @@ claimFContract fp = do
 
             _ -> throwError "unexpected datum"
 
+-- claimFFContract :: FreelanceContract -> Contract w s Text ()
+-- claimFFContract fc= do
+--     now <- Contract.currentTime
+--     void $ mapError' $ runStep (fContractClient fc) $ Claim now
 
-endFContract :: forall s. FreelancerParams -> Contract (Last ThreadToken) s Text ()
+
+endFContract :: FreelanceContract -> Contract w s Text ()
 endFContract fp = do
     now <- Contract.currentTime
-    pkh <- pubKeyHash <$> Contract.ownPubKey
-    let fcontract   = FreelanceContract
-            { employer          = fEmployer fp
-            , freelancer        = pkh
-            , numberOfIntervals = fNumberOfIntervals fp
-            , intervalLength    = fIntervalLength fp
-            , startTime         = fStartTime fp
-            , signDeadline      = fSignDeadline fp
-            , totalPayment      = fTotalPayment fp
-            , cToken            = fToken fp
-            }
-        client = fContractClient fcontract
-
+    let client = fContractClient fp
     m <- mapError' $ getOnChainState client
     case m of
             Nothing             -> throwError "Contract ouput not found"
@@ -390,17 +359,42 @@ endFContract fp = do
                     logInfo @String "Contract Ended."
 
             _ -> throwError "unexpected datum"
-type FContractSchema = Endpoint "start"  EmployerParams
-                   .\/ Endpoint "accept" FreelancerParams 
-                   .\/ Endpoint "claim"  FreelancerParams
-                   .\/ Endpoint "end"    FreelancerParams
 
 
+type FStartSchema    = Endpoint "start"  ()
+type FContractSchema = 
+                       Endpoint "accept" ()
+                   .\/ Endpoint "claim"  ()
+                   .\/ Endpoint "end"    ()
 
-endpoints :: Contract (Last ThreadToken) FContractSchema Text ()
-endpoints = (start `select` accept `select` claim `select` end) >> endpoints
+startEndpoints :: EmployerParams -> Contract (Last FreelanceContract) FStartSchema Text ()
+startEndpoints ep = h $ do 
+    endpoint @"start" 
+    startFContract ep
+    where
+        -- Error handling function to log the error
+        h :: Contract (Last FreelanceContract) FStartSchema Text () -> Contract (Last FreelanceContract) FStartSchema Text ()
+        h = handleError logError
+
+--
+endpoints :: FreelanceContract -> Contract () FContractSchema Text ()
+endpoints fc = (accept `select` claim `select` end) >> endpoints fc
   where
-    start  = endpoint @"start"  >>= startFContract
-    accept = endpoint @"accept" >>= acceptFContract
-    claim  = endpoint @"claim"  >>= claimFContract
-    end    = endpoint @"end"    >>= endFContract
+    accept :: Contract () FContractSchema Text ()
+    accept = h $ do
+        endpoint @"accept" 
+        acceptFContract fc
+
+    claim :: Contract () FContractSchema Text ()
+    claim = h $ do
+        endpoint @"claim"
+        claimFContract fc
+
+    end :: Contract () FContractSchema Text ()
+    end = h $ do
+        endpoint @"end"
+        endFContract fc
+
+    -- Error handling function to log the error
+    h :: Contract () FContractSchema Text () -> Contract () FContractSchema Text ()
+    h = handleError logError

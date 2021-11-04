@@ -47,53 +47,53 @@ testTrace = runEmulatorTraceIO $ traceIt empParams
 
 traceIt :: EmployerParams -> EmulatorTrace ()
 traceIt ep = do
-    -- Wont change
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
-    -- Wont change
+
+    h1 <- activateContractWallet (Wallet 1) $ startEndpoints ep 
+
     let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
         pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
-    -- Wont change
-    callEndpoint @"start" h1 ep
-    -- Wont change
-    tt <- getTT h1
-    let fp = FreelancerParams
-                { fEmployer             = pkh1
-                , fNumberOfIntervals    = eNumberOfIntervals ep
-                , fIntervalLength       = eIntervalLength ep
-                , fTotalPayment         = eTotalPayment ep
-                , fStartTime            = eStartTime ep
-                , fSignDeadline         = eSignDeadline ep
-                , fToken                = tt
-                }
-    -- This is where the traces will differ
-    void $ Emulator.waitNSlots 2
 
-    callEndpoint @"accept" h2 fp
+    callEndpoint @"start" h1 ()
+    void $ Emulator.waitNSlots 10
 
-    Extras.logInfo $ "StartTime: " ++ show (fStartTime fp) ++ "Slot 13 Time:" ++ show (slotToEndPOSIXTime def 13)
-    -- Call accept after the time has passed
+    Last m <- observableState h1
+    void $ Emulator.waitNSlots 5
+    -- case m of
+    --     Nothing -> Extras.logError @String "error starting token sale"
+    --     Just fc -> do
+            
+    --         Extras.logInfo $ "Freelance contract started" ++ show fc
 
-    void $ Emulator.waitNSlots 16   -- slot 20 is start
+    --         h1 <- activateContractWallet (Wallet 1) $ endpoints fc 
+    --         h2 <- activateContractWallet (Wallet 2) $ endpoints fc
+    --         h3 <- activateContractWallet (Wallet 3) $ endpoints fc
 
-    void $ Emulator.waitNSlots 15   -- slot 35 is second 
+    --         void $ Emulator.waitNSlots 2
+
+    --         callEndpoint @"accept" h2 ()
+
+    --         -- Call accept after the time has passed
+
+    --         void $ Emulator.waitNSlots 16   -- slot 20 is start
+
+    --         void $ Emulator.waitNSlots 15   -- slot 35 is second 
+            
+    --         callEndpoint @"claim" h2 ()
+
+    --         void $ Emulator.waitNSlots 6   -- slot 45
+
+    --         callEndpoint @"end" h2 ()     -- third interval  
+
+    --         void $ Emulator.waitNSlots 10   -- slot 55
+
+    --         callEndpoint @"claim" h2 ()
+
     
-    callEndpoint @"claim" h2 fp
-
-    void $ Emulator.waitNSlots 10   -- slot 45
-
-    callEndpoint @"end" h2 fp     -- third interval  
-
-    void $ Emulator.waitNSlots 10   -- slot 55
-
-    callEndpoint @"claim" h2 fp
-
-    
-  where
-    getTT :: ContractHandle (Last ThreadToken) FContractSchema Text -> EmulatorTrace ThreadToken
-    getTT h = do
-        void $ Emulator.waitNSlots 1
-        Last m <- observableState h
-        case m of
-            Nothing -> getTT h
-            Just tt -> Extras.logInfo ("read thread token " ++ show tt) >> return tt
+--   where
+--     getTT :: ContractHandle (Last ThreadToken) fcontractSchema Text -> EmulatorTrace ThreadToken
+--     getTT h = do
+--         void $ Emulator.waitNSlots 1
+--         Last m <- observableState h
+--         case m of
+--             Nothing -> getTT h
+--             Just tt -> Extras.logInfo ("read thread token " ++ show tt) >> return tt

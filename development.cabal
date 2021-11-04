@@ -35,6 +35,7 @@ test-suite freelance-tests
   main-is: Tests.hs
   hs-source-dirs:      test
   other-modules:       UnitTests.BasicTests
+                     , UnitTests.EndingTests
                      , PropertyTests.Model
   default-language: Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -main-is Main
